@@ -1,29 +1,44 @@
 pipeline {
     agent any
-
     environment {
-        IMAGE = "ankushmalgotra/simple-python-app"
-        TAG = "v${env.BUILD_NUMBER}"
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
+        IMAGE_NAME = "ankushmalgotra/simple-python-app"
+        IMAGE_TAG = "v1"
+        CONTAINER_NAME = "simple-python-app-container"
     }
-
     stages {
-        stage('Ankush Malgotra - Build Docker Image') {
+        stage('Checkout Code') {
             steps {
-                sh 'docker build -t ${IMAGE}:${TAG} .'
+                checkout scm
             }
         }
 
-        stage('Ankush Malgotra - Login to Dockerhub') {
+        stage('Build Docker Image') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
-                    sh 'echo $PASS | docker login -u $USER --password-stdin'
-                }
+                sh "docker build -t $IMAGE_NAME:$IMAGE_TAG ."
             }
         }
 
-        stage('Ankush Malgotra - Push image to Dockerhub') {
+        stage('Login to DockerHub') {
             steps {
-                sh 'docker push ${IMAGE}:${TAG}'
+                sh 'echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin'
+            }
+        }
+
+        stage('Push Image to DockerHub') {
+            steps {
+                sh "docker push $IMAGE_NAME:$IMAGE_TAG"
+            }
+        }
+
+        stage('Run Container Locally') {
+            steps {
+                // Stop and remove any existing container with same name
+                sh "docker stop $CONTAINER_NAME || true"
+                sh "docker rm $CONTAINER_NAME || true"
+
+                // Run the container in detached mode
+                sh "docker run -d -p 8081:8081 --name $CONTAINER_NAME $IMAGE_NAME:$IMAGE_TAG"
             }
         }
     }
